@@ -356,6 +356,7 @@ class OptimizedFFmpegWrapper(FFmpegWrapper):
         enable_gpu: 是否启用 GPU 加速
         preset: 编码预设（ultrafast, fast, medium, slow 等）
         gpu_encoder: 检测到的 GPU 编码器名称
+        gpu_info: GPU 信息字典
     """
     
     def __init__(self, enable_gpu: bool = False, preset: str = "medium"):
@@ -372,7 +373,115 @@ class OptimizedFFmpegWrapper(FFmpegWrapper):
         super().__init__()
         self.enable_gpu = enable_gpu
         self.preset = preset
+        self.gpu_info = self._detect_gpu_hardware()
         self.gpu_encoder = self._detect_gpu_encoder()
+        self._print_gpu_status()
+    
+    def _detect_gpu_hardware(self) -> Dict[str, Any]:
+        """检测 GPU 硬件信息
+        
+        Returns:
+            GPU 信息字典，包含：
+            - has_nvidia: 是否有 NVIDIA GPU
+            - has_intel: 是否有 Intel GPU
+            - nvidia_info: NVIDIA GPU 详细信息
+            - cuda_available: CUDA 是否可用
+        """
+        gpu_info = {
+            'has_nvidia': False,
+            'has_intel': False,
+            'nvidia_info': None,
+            'cuda_available': False
+        }
+        
+        # 检测 NVIDIA GPU
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=name,driver_version,memory.total', '--format=csv,noheader'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                gpu_info['has_nvidia'] = True
+                gpu_info['nvidia_info'] = result.stdout.strip()
+                
+                # 检测 CUDA
+                try:
+                    cuda_result = subprocess.run(
+                        ['nvcc', '--version'],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if cuda_result.returncode == 0:
+                        gpu_info['cuda_available'] = True
+                except:
+                    pass
+        except:
+            pass
+        
+        # 检测 Intel GPU (通过 /proc/cpuinfo 或 lspci)
+        try:
+            result = subprocess.run(
+                ['lspci'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if 'Intel' in result.stdout and 'VGA' in result.stdout:
+                gpu_info['has_intel'] = True
+        except:
+            pass
+        
+        return gpu_info
+    
+    def _print_gpu_status(self) -> None:
+        """打印 GPU 状态信息"""
+        print("\n" + "="*60)
+        print("GPU 加速状态检测")
+        print("="*60)
+        
+        # 打印硬件检测结果
+        if self.gpu_info['has_nvidia']:
+            print(f"✓ 检测到 NVIDIA GPU")
+            if self.gpu_info['nvidia_info']:
+                print(f"  GPU 信息: {self.gpu_info['nvidia_info']}")
+            if self.gpu_info['cuda_available']:
+                print(f"  CUDA: 可用")
+            else:
+                print(f"  CUDA: 未安装")
+        else:
+            print("✗ 未检测到 NVIDIA GPU")
+        
+        if self.gpu_info['has_intel']:
+            print(f"✓ 检测到 Intel GPU")
+        else:
+            print("✗ 未检测到 Intel GPU")
+        
+        print()
+        
+        # 打印编码器状态
+        if self.enable_gpu:
+            if self.gpu_encoder:
+                print(f"✓ GPU 加速: 已启用")
+                print(f"  使用编码器: {self.gpu_encoder}")
+                
+                if 'nvenc' in self.gpu_encoder:
+                    print(f"  类型: NVIDIA NVENC 硬件编码")
+                elif 'qsv' in self.gpu_encoder:
+                    print(f"  类型: Intel Quick Sync Video")
+                elif 'videotoolbox' in self.gpu_encoder:
+                    print(f"  类型: macOS VideoToolbox")
+            else:
+                print(f"✗ GPU 加速: 已请求但不可用")
+                print(f"  原因: FFmpeg 未检测到支持的 GPU 编码器")
+                print(f"  将使用 CPU 编码 (libx264)")
+        else:
+            print(f"○ GPU 加速: 未启用")
+            print(f"  使用 CPU 编码 (libx264)")
+        
+        print("="*60 + "\n")
     
     def _detect_gpu_encoder(self) -> Optional[str]:
         """检测可用的 GPU 编码器
@@ -400,12 +509,17 @@ class OptimizedFFmpegWrapper(FFmpegWrapper):
             
             encoders_output = result.stdout
             
-            # 按优先级检测 GPU 编码器
-            if 'h264_nvenc' in encoders_output:
+            # 按优先级检测 GPU 编码器，但要验证硬件是否真的存在
+            # NVIDIA NVENC - 需要 NVIDIA GPU
+            if 'h264_nvenc' in encoders_output and self.gpu_info['has_nvidia']:
                 return 'h264_nvenc'
-            elif 'h264_qsv' in encoders_output:
+            
+            # Intel Quick Sync - 需要 Intel GPU
+            if 'h264_qsv' in encoders_output and self.gpu_info['has_intel']:
                 return 'h264_qsv'
-            elif 'h264_videotoolbox' in encoders_output:
+            
+            # macOS VideoToolbox
+            if 'h264_videotoolbox' in encoders_output:
                 return 'h264_videotoolbox'
             
         except Exception:

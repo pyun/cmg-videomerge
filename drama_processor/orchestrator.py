@@ -30,7 +30,9 @@ class Orchestrator:
         error_handler: Optional[ErrorHandler] = None,
         audio_separator_model: str = "spleeter:2stems",
         accompaniment_volume: float = 0.0,
-        transcode_specs: Optional[List] = None
+        transcode_specs: Optional[List] = None,
+        enable_gpu: bool = False,
+        preset: str = "medium"
     ):
         """初始化编排器
         
@@ -40,13 +42,20 @@ class Orchestrator:
             audio_separator_model: 音频分离模型
             accompaniment_volume: 伴奏保留音量（0.0-1.0）
             transcode_specs: 转码规格列表
+            enable_gpu: 是否启用 GPU 加速
+            preset: 编码预设
         """
         self.merger = VideoMerger()
         self.separator = AudioSeparator(
             model=audio_separator_model,
             accompaniment_volume=accompaniment_volume
         )
-        self.transcoder = VideoTranscoder(specs=transcode_specs)
+        self.transcoder = VideoTranscoder(
+            specs=transcode_specs,
+            enable_gpu=enable_gpu,
+            preset=preset,
+            logger=logger
+        )
         self.scanner = DirectoryScanner()
         self.logger = logger or ProcessingLogger()
         self.error_handler = error_handler or ErrorHandler()
@@ -276,7 +285,9 @@ class ConcurrentOrchestrator(Orchestrator):
         error_handler: Optional[ErrorHandler] = None,
         audio_separator_model: str = "spleeter:2stems",
         accompaniment_volume: float = 0.0,
-        transcode_specs: Optional[List] = None
+        transcode_specs: Optional[List] = None,
+        enable_gpu: bool = False,
+        preset: str = "medium"
     ):
         """初始化并发编排器
         
@@ -287,8 +298,10 @@ class ConcurrentOrchestrator(Orchestrator):
             audio_separator_model: 音频分离模型
             accompaniment_volume: 伴奏保留音量（0.0-1.0）
             transcode_specs: 转码规格列表
+            enable_gpu: 是否启用 GPU 加速
+            preset: 编码预设
         """
-        super().__init__(logger, error_handler, audio_separator_model, accompaniment_volume, transcode_specs)
+        super().__init__(logger, error_handler, audio_separator_model, accompaniment_volume, transcode_specs, enable_gpu, preset)
         self.max_workers = max_workers
         self._lock = None  # 延迟初始化,避免序列化问题
     

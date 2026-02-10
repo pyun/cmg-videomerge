@@ -23,7 +23,7 @@ from .progress import ProgressTracker
 from .error_handler import ErrorHandler
 
 
-def create_orchestrator(config: ProcessingConfig) -> Orchestrator:
+def create_orchestrator(config: ProcessingConfig, enable_gpu: bool = False, preset: str = "medium") -> Orchestrator:
     """根据配置创建合适的编排器
     
     根据配置选项创建不同功能组合的编排器：
@@ -34,6 +34,8 @@ def create_orchestrator(config: ProcessingConfig) -> Orchestrator:
     
     Args:
         config: 处理配置对象
+        enable_gpu: 是否启用 GPU 加速
+        preset: 编码预设
         
     Returns:
         配置好的编排器实例
@@ -56,7 +58,9 @@ def create_orchestrator(config: ProcessingConfig) -> Orchestrator:
             error_handler=error_handler,
             audio_separator_model=config.audio_separator_model,
             accompaniment_volume=config.accompaniment_volume,
-            transcode_specs=config.transcode_specs
+            transcode_specs=config.transcode_specs,
+            enable_gpu=enable_gpu,
+            preset=preset
         )
     else:
         # 使用基础编排器
@@ -65,7 +69,9 @@ def create_orchestrator(config: ProcessingConfig) -> Orchestrator:
             error_handler=error_handler,
             audio_separator_model=config.audio_separator_model,
             accompaniment_volume=config.accompaniment_volume,
-            transcode_specs=config.transcode_specs
+            transcode_specs=config.transcode_specs,
+            enable_gpu=enable_gpu,
+            preset=preset
         )
     
     # 如果启用断点续传，包装为可续传编排器
@@ -364,18 +370,20 @@ def run_separate(config: ProcessingConfig) -> bool:
         return False
 
 
-def run_transcode(config: ProcessingConfig) -> bool:
+def run_transcode(config: ProcessingConfig, enable_gpu: bool = False, preset: str = "medium") -> bool:
     """执行视频转码
     
     Args:
         config: 处理配置对象
+        enable_gpu: 是否启用 GPU 加速
+        preset: 编码预设
         
     Returns:
         是否成功（所有任务都成功返回 True）
     """
     try:
         # 创建编排器
-        orchestrator = create_orchestrator(config)
+        orchestrator = create_orchestrator(config, enable_gpu=enable_gpu, preset=preset)
         
         # 创建进度跟踪器
         progress_tracker = ProgressTracker(show_progress=True)

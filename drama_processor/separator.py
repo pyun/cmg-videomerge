@@ -69,6 +69,41 @@ class AudioSeparator(VideoProcessor):
         self.model = model
         self.accompaniment_volume = max(0.0, min(1.0, accompaniment_volume))  # 限制在0-1之间
         self._separator_checked = False  # 延迟检查标志
+        self._print_tensorflow_gpu_status()
+    
+    def _print_tensorflow_gpu_status(self) -> None:
+        """打印 TensorFlow GPU 状态"""
+        print("\n" + "="*60)
+        print("Spleeter (TensorFlow) GPU 加速状态")
+        print("="*60)
+        
+        try:
+            import tensorflow as tf
+            
+            # 检测 GPU 设备
+            gpus = tf.config.list_physical_devices('GPU')
+            
+            if gpus:
+                print(f"✓ TensorFlow 检测到 {len(gpus)} 个 GPU 设备:")
+                for i, gpu in enumerate(gpus):
+                    print(f"  GPU {i}: {gpu.name}")
+                
+                # 检查 CUDA 和 cuDNN 版本
+                print(f"\n  CUDA 版本: {tf.sysconfig.get_build_info().get('cuda_version', '未知')}")
+                print(f"  cuDNN 版本: {tf.sysconfig.get_build_info().get('cudnn_version', '未知')}")
+                print(f"\n  Spleeter 音频分离将使用 GPU 加速")
+            else:
+                print("✗ TensorFlow 未检测到 GPU")
+                print("  Spleeter 将使用 CPU 进行音频分离")
+                print("  提示: 如需 GPU 加速，请安装 tensorflow-gpu 和 CUDA")
+            
+        except ImportError:
+            print("✗ 无法导入 TensorFlow")
+            print("  请确保已安装 TensorFlow")
+        except Exception as e:
+            print(f"✗ 检测 TensorFlow GPU 时出错: {e}")
+        
+        print("="*60 + "\n")
     
     def _check_separator_available(self) -> None:
         """检查音频分离工具是否可用

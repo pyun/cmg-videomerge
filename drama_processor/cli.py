@@ -438,6 +438,17 @@ def separate(
     help='转码规格 (如: 1080p, 720p, 480p 或 1920x1080)，可多次指定'
 )
 @click.option(
+    '--gpu/--no-gpu',
+    default=False,
+    help='启用/禁用 GPU 加速编码 (默认: 禁用)'
+)
+@click.option(
+    '--preset',
+    default='medium',
+    type=click.Choice(['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow']),
+    help='编码预设，影响速度和质量 (默认: medium)'
+)
+@click.option(
     '--log-level', '-l',
     default='INFO',
     type=str,
@@ -463,6 +474,8 @@ def transcode(
     drama_root: Path,
     workers: int,
     specs: Tuple[str, ...],
+    gpu: bool,
+    preset: str,
     log_level: str,
     log_file: Optional[str],
     report_dir: Optional[str],
@@ -518,11 +531,12 @@ def transcode(
         
         click.echo(f"开始转码视频: {drama_root}")
         specs_str = ', '.join([spec.resolution_name for spec in transcode_specs])
-        click.echo(f"配置: 并发数={workers}, 规格=[{specs_str}]")
+        gpu_status = "启用" if gpu else "禁用"
+        click.echo(f"配置: 并发数={workers}, 规格=[{specs_str}], GPU={gpu_status}, 预设={preset}")
         
         # 调用实际的转码逻辑
         from .main import run_transcode
-        success = run_transcode(processing_config)
+        success = run_transcode(processing_config, enable_gpu=gpu, preset=preset)
         
         if not success:
             sys.exit(1)

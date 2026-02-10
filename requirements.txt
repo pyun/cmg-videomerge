@@ -6,5 +6,5 @@ spleeter==2.3.0
 # 系统监控
 psutil>=5.9.0
 
-# CLI
-click>=8.0.0
+# CLI (兼容 spleeter 的 typer 依赖)
+click>=7.1.1,<8.0.0
